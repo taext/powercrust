@@ -1,3 +1,4 @@
+git remote set-url origin git@github.com:your-username/new-repo-name.git
 # PowerCrust v1.0
 (this is a Rust re-implementation of my powercasts module)
 
@@ -24,14 +25,14 @@ A command-line utility that extracts media files from RSS feeds listed in an OPM
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/rss-feed-scraper.git
-cd rss-feed-scraper
+git clone https://github.com/taext/powercrust.git
+cd powercrust
 
 # Build with cargo
 cargo build --release
 
 # Optional: copy to your PATH
-cp target/release/rss-feed-scraper /usr/local/bin/
+cp target/release/powercrust /usr/local/bin/
 ```
 
 ## Usage
@@ -39,7 +40,7 @@ cp target/release/rss-feed-scraper /usr/local/bin/
 The basic usage is:
 
 ```bash
-rss-feed-scraper [OPTIONS] <OPML_FILE>
+powercrust [OPTIONS] <OPML_FILE>
 ```
 
 ### Arguments
@@ -57,22 +58,22 @@ rss-feed-scraper [OPTIONS] <OPML_FILE>
 
 ```bash
 # Basic usage - parse feeds from subscriptions.opml
-rss-feed-scraper subscriptions.opml
+powercrust subscriptions.opml
 
 # Include all episodes, not just recent ones
-rss-feed-scraper --check-current false subscriptions.opml
+powercrust --check-current false subscriptions.opml
 
 # Consider episodes from the last 7 days as current
-rss-feed-scraper --days 7 subscriptions.opml
+powercrust --days 7 subscriptions.opml
 
 # Sort episodes chronologically in the output file
-rss-feed-scraper --chronological true subscriptions.opml
+powercrust --chronological true subscriptions.opml
 
 # Output newest episodes in Markdown format
-rss-feed-scraper --format md subscriptions.opml
+powercrust --format md subscriptions.opml
 
 # Output newest episodes in HTML format
-rss-feed-scraper --format html subscriptions.opml
+powercrust --format html subscriptions.opml
 ```
 
 ## Output Files
