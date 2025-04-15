@@ -1,6 +1,6 @@
 [package]
-name = "rss_scraper"
-version = "0.2.0"
+name = "powercrust"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
