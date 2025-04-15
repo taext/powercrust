@@ -4,3 +4,4 @@ CACHEDIR.TAG
 .fingerprint/*
 target/release/.fingerprint/
 target/
+!target/release/
