@@ -1,0 +1,1 @@
+{"rustc":943729520361454143,"features":"[\"default\", \"std\"]","declared_features":"[\"default\", \"std\"]","target":6736969174785652482,"profile":2040997289075261528,"path":782035981216388171,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"release/.fingerprint/never-52d5f7f1cedcb429/dep-lib-never","checksum":false}}],"rustflags":[],"config":2069994364910194474,"compile_kind":0}
