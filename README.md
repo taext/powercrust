@@ -1,4 +1,3 @@
-git remote set-url origin git@github.com:your-username/new-repo-name.git
 # PowerCrust v1.0
 (this is a Rust re-implementation of my powercasts module)
 
