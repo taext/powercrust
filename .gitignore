@@ -1,7 +1,0 @@
-.rustc_info.json
-CACHEDIR.TAG
-.cargo-lock
-.fingerprint/*
-target/release/.fingerprint/
-target/
-!target/release/
