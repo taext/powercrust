@@ -10,7 +10,7 @@ A command-line utility that extracts media files from RSS feeds listed in an OPM
 - Creates a list of all media URLs in a text file
 - Generates a separate list of the newest episodes from each feed
 - Supports multiple output formats for newest episodes (plain text, Markdown, HTML)
-- Optional chronological sorting of episodes in the output file
+- Optional chronological sorting of episodes in the output file [NOT FUNCTIONAL ATM]
 - Configurable time window for "current" episodes
 
 ## Installation
