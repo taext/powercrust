@@ -1,4 +1,5 @@
-# RSS Feed Scraper
+# PowerCrust v1.0
+(this is a Rust re-implementation of my powercasts module)
 
 A command-line utility that extracts media files from RSS feeds listed in an OPML file.
 
