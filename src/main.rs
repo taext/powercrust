@@ -3,7 +3,7 @@ use regex::Regex;
 use reqwest::{Client, StatusCode};
 use futures::future::join_all;
 use std::{
-    collections::{HashSet, HashMap},
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, Write},
     path::PathBuf,
@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc, Duration};
 use rss::Channel;
 use clap::{App, Arg};
 
+#[derive(Clone)]
 struct Episode {
     feed_name: String,
     title: String,
@@ -41,9 +42,17 @@ async fn main() {
             Arg::with_name("check_current")
                 .short('c')
                 .long("check-current")
-                .help("Only include episodes published within the last 30 days")
+                .help("Only include episodes published within the last 30 days in newest output")
                 .takes_value(true)
                 .default_value("true"),
+        )
+        .arg(
+            Arg::with_name("filter_all")
+                .short('a')
+                .long("filter-all")
+                .help("Apply time filter to all_files output as well (not just newest)")
+                .takes_value(true)
+                .default_value("false"),
         )
         .arg(
             Arg::with_name("days")
@@ -70,11 +79,11 @@ async fn main() {
                 .default_value("txt")
                 .use_delimiter(true)
                 .require_delimiter(true)
-                .value_delimiter(","),
+                .value_delimiter(','),
         )
         .arg(
             Arg::with_name("all_files_format")
-                .short('a')
+                .short('F')
                 .long("all-format")
                 .help("Format for all_files output (txt, md, html)")
                 .takes_value(true)
@@ -94,6 +103,9 @@ async fn main() {
     
     let check_current = matches.value_of("check_current")
         .unwrap_or("true")
+        .to_lowercase() == "true";
+    let filter_all = matches.value_of("filter_all")
+        .unwrap_or("false")
         .to_lowercase() == "true";
     let current_days = matches
         .value_of("days")
@@ -136,70 +148,71 @@ async fn main() {
     // Extract all episodes with dates for chronological sorting (if enabled)
     let media_regex = Regex::new(r#""(http\S+?\.(mp3|mp4))["?]"#).unwrap();
     
-    // Process feeds to extract episodes
-    let mut all_episodes: Vec<Episode> = Vec::new();
-    
-    for (feed_name, content) in &raw_results {
-        if let Ok(channel) = Channel::read_from(content.as_bytes()) {
-            for item in channel.items() {
-                // Find media URL using same logic as for newest episodes
-                let media_url = if let Some(enclosure) = item.enclosure() {
-                    // First try the enclosure
-                    enclosure.url.clone()
-                } else {
-                    // Fall back to regex search in item description or content
-                    let description = item.description().unwrap_or_default();
-                    let content_encoded = item.extensions().get("content")
-                        .and_then(|c| c.get("encoded"))
-                        .and_then(|e| e.first())
-                        .and_then(|v| v.value.as_deref())
-                        .unwrap_or_default();
-                    
-                    let combined_content = format!("{} {}", description, content_encoded);
-                    
-                    if let Some(cap) = media_regex.captures(&combined_content) {
-                        if let Some(url) = cap.get(1).map(|m| m.as_str().to_owned()) {
-                            url
+    // Process all episodes - handle the two different approaches based on chronological flag
+    if chronological {
+        // Process feeds using structured approach with proper date filtering
+        let mut all_episodes: Vec<Episode> = Vec::new();
+        
+        for (feed_name, content) in &raw_results {
+            if let Ok(channel) = Channel::read_from(content.as_bytes()) {
+                for item in channel.items() {
+                    // Find media URL
+                    let media_url = if let Some(enclosure) = item.enclosure() {
+                        // First try the enclosure
+                        enclosure.url.clone()
+                    } else {
+                        // Fall back to regex search in item description or content
+                        let description = item.description().unwrap_or_default();
+                        let content_encoded = item.extensions().get("content")
+                            .and_then(|c| c.get("encoded"))
+                            .and_then(|e| e.first())
+                            .and_then(|v| v.value.as_deref())
+                            .unwrap_or_default();
+                        
+                        let combined_content = format!("{} {}", description, content_encoded);
+                        
+                        if let Some(cap) = media_regex.captures(&combined_content) {
+                            if let Some(url) = cap.get(1).map(|m| m.as_str().to_owned()) {
+                                url
+                            } else {
+                                continue; // Skip if no media URL found
+                            }
                         } else {
                             continue; // Skip if no media URL found
                         }
-                    } else {
-                        continue; // Skip if no media URL found
-                    }
-                };
-                
-                // Parse publication date
-                let pub_date = item.pub_date().and_then(|date_str| {
-                    DateTime::parse_from_rfc2822(date_str)
-                        .ok()
-                        .map(|dt| dt.with_timezone(&Utc))
-                });
-                
-                // Skip if we're checking for currency and the episode is too old
-                if check_current {
-                    if let Some(date) = pub_date {
-                        let cutoff_date = Utc::now() - Duration::days(current_days);
-                        if date < cutoff_date {
+                    };
+                    
+                    // Parse publication date
+                    let pub_date = item.pub_date().and_then(|date_str| {
+                        DateTime::parse_from_rfc2822(date_str)
+                            .ok()
+                            .map(|dt| dt.with_timezone(&Utc))
+                    });
+                    
+                    // Skip if we're checking for currency, filter_all is true,
+                    // and the episode is too old
+                    if check_current && filter_all {
+                        if let Some(date) = pub_date {
+                            let cutoff_date = Utc::now() - Duration::days(current_days);
+                            if date < cutoff_date {
+                                continue;
+                            }
+                        } else {
+                            // If no date is available and we're checking for currency, skip
                             continue;
                         }
-                    } else {
-                        // If no date is available and we're checking for currency, skip
-                        continue;
                     }
+                    
+                    all_episodes.push(Episode {
+                        feed_name: feed_name.clone(),
+                        title: item.title().unwrap_or("Unknown").to_string(),
+                        pub_date,
+                        media_url,
+                    });
                 }
-                
-                all_episodes.push(Episode {
-                    feed_name: feed_name.clone(),
-                    title: item.title().unwrap_or("Unknown").to_string(),
-                    pub_date,
-                    media_url,
-                });
             }
         }
-    }
-    
-    // Sort episodes based on the chronological flag
-    if chronological {
+        
         // Sort episodes chronologically (oldest first)
         all_episodes.sort_by(|a, b| {
             match (&a.pub_date, &b.pub_date) {
@@ -209,48 +222,213 @@ async fn main() {
                 (None, None) => std::cmp::Ordering::Equal,
             }
         });
-    } else {
-        // Sort by feed name and then by date (newest first within each feed)
-        all_episodes.sort_by(|a, b| {
-            match a.feed_name.cmp(&b.feed_name) {
-                std::cmp::Ordering::Equal => match (&b.pub_date, &a.pub_date) {
-                    (Some(b_date), Some(a_date)) => b_date.cmp(a_date),
-                    (Some(_), None) => std::cmp::Ordering::Less,
-                    (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => std::cmp::Ordering::Equal,
-                },
-                other => other,
-            }
-        });
-    }
-    
-    // Write all episodes to file in the requested format
-    write_episodes_to_file(
-        &all_episodes, 
-        &output_txt, 
-        all_files_format, 
-        "All Podcast Episodes"
-    );
-    
-    // Process feeds to extract newest episodes
-    let mut newest_episodes_map: HashMap<String, Episode> = HashMap::new();
-    
-    for episode in &all_episodes {
-        let entry = newest_episodes_map.entry(episode.feed_name.clone());
-        entry.or_insert_with(|| episode.clone());
-    }
-    
-    let newest_episodes: Vec<Episode> = newest_episodes_map.values().cloned().collect();
-    
-    // Write newest episodes in each requested format
-    for format in &formats {
-        let newest_path = opml_path.parent().unwrap().join(format!("newest.{}", format));
+        
+        // Write all episodes to file in the requested format
         write_episodes_to_file(
-            &newest_episodes, 
-            &newest_path, 
-            format, 
-            "Newest Podcast Episodes"
+            &all_episodes, 
+            &output_txt, 
+            all_files_format, 
+            "All Podcast Episodes"
         );
+        
+        println!("Found {} episodes.", all_episodes.len());
+        
+        // Process feeds to extract newest episodes - only filter these by date in all cases
+        let mut newest_episodes_map: HashMap<String, Episode> = HashMap::new();
+        
+        // Filter a copy of all_episodes for newest collection
+        let filtered_episodes: Vec<Episode> = all_episodes
+            .iter()
+            .filter(|episode| {
+                if !check_current {
+                    return true;
+                }
+                if let Some(date) = episode.pub_date {
+                    let cutoff_date = Utc::now() - Duration::days(current_days);
+                    date >= cutoff_date
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect();
+        
+        for episode in filtered_episodes {
+            newest_episodes_map.entry(episode.feed_name.clone())
+                .or_insert(episode);
+        }
+        
+        let newest_episodes: Vec<Episode> = newest_episodes_map.into_values().collect();
+        
+        // Write newest episodes in each requested format
+        for format in &formats {
+            let newest_path = opml_path.parent().unwrap().join(format!("newest.{}", format));
+            write_episodes_to_file(
+                &newest_episodes, 
+                &newest_path, 
+                format, 
+                "Newest Podcast Episodes"
+            );
+        }
+    } else {
+        // Original functionality - extract using regex for all files
+        // This preserves backward compatibility with the original approach
+        let mut media_urls: Vec<Episode> = Vec::new();
+        
+        for (feed_name, content) in &raw_results {
+            // First extract through RSS for structured data
+            if let Ok(channel) = Channel::read_from(content.as_bytes()) {
+                for item in channel.items() {
+                    if let Some(enclosure) = item.enclosure() {
+                        let pub_date = item.pub_date().and_then(|date_str| {
+                            DateTime::parse_from_rfc2822(date_str)
+                                .ok()
+                                .map(|dt| dt.with_timezone(&Utc))
+                        });
+                        
+                        // Only filter by date if filter_all is true
+                        if check_current && filter_all {
+                            if let Some(date) = pub_date {
+                                let cutoff_date = Utc::now() - Duration::days(current_days);
+                                if date < cutoff_date {
+                                    continue;
+                                }
+                            } else {
+                                continue;
+                            }
+                        }
+                        
+                        media_urls.push(Episode {
+                            feed_name: feed_name.clone(),
+                            title: item.title().unwrap_or("Unknown").to_string(),
+                            pub_date,
+                            media_url: enclosure.url.clone(),
+                        });
+                    }
+                }
+            }
+            
+            // Also search for URLs with regex
+            let mut feed_urls: Vec<String> = Vec::new();
+            for cap in media_regex.captures_iter(content) {
+                if let Some(url) = cap.get(1).map(|m| m.as_str().to_owned()) {
+                    if !feed_urls.contains(&url) {
+                        feed_urls.push(url.clone());
+                        // For URLs found with regex, we don't have structured data
+                        media_urls.push(Episode {
+                            feed_name: feed_name.clone(),
+                            title: "Unknown".to_string(),
+                            pub_date: None,
+                            media_url: url,
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Write all media URLs to output file in the requested format
+        write_episodes_to_file(
+            &media_urls, 
+            &output_txt, 
+            all_files_format, 
+            "All Podcast Episodes"
+        );
+        
+        println!("Found {} episodes with media URLs.", media_urls.len());
+        
+        // Process feeds to extract newest episodes - always filter these by date
+        let mut all_episodes: Vec<Episode> = Vec::new();
+        
+        for (feed_name, content) in &raw_results {
+            if let Ok(channel) = Channel::read_from(content.as_bytes()) {
+                for item in channel.items() {
+                    // Find media URL
+                    let media_url = if let Some(enclosure) = item.enclosure() {
+                        // First try the enclosure
+                        enclosure.url.clone()
+                    } else {
+                        // Fall back to regex search in item description or content
+                        let description = item.description().unwrap_or_default();
+                        let content_encoded = item.extensions().get("content")
+                            .and_then(|c| c.get("encoded"))
+                            .and_then(|e| e.first())
+                            .and_then(|v| v.value.as_deref())
+                            .unwrap_or_default();
+                        
+                        let combined_content = format!("{} {}", description, content_encoded);
+                        
+                        if let Some(cap) = media_regex.captures(&combined_content) {
+                            if let Some(url) = cap.get(1).map(|m| m.as_str().to_owned()) {
+                                url
+                            } else {
+                                continue; // Skip if no media URL found
+                            }
+                        } else {
+                            continue; // Skip if no media URL found
+                        }
+                    };
+                    
+                    // Parse publication date
+                    let pub_date = item.pub_date().and_then(|date_str| {
+                        DateTime::parse_from_rfc2822(date_str)
+                            .ok()
+                            .map(|dt| dt.with_timezone(&Utc))
+                    });
+                    
+                    // Only keep episodes from the last N days if check_current is enabled
+                    if check_current {
+                        if let Some(date) = pub_date {
+                            let cutoff_date = Utc::now() - Duration::days(current_days);
+                            if date < cutoff_date {
+                                continue;
+                            }
+                        } else {
+                            // If no date is available and we're checking for currency, skip
+                            continue;
+                        }
+                    }
+                    
+                    all_episodes.push(Episode {
+                        feed_name: feed_name.clone(),
+                        title: item.title().unwrap_or("Unknown").to_string(),
+                        pub_date,
+                        media_url,
+                    });
+                }
+            }
+        }
+        
+        // For newest episodes, collect the newest per feed
+        let mut newest_episodes_map: HashMap<String, Episode> = HashMap::new();
+        
+        for episode in &all_episodes {
+            let entry = newest_episodes_map.entry(episode.feed_name.clone());
+            match entry {
+                std::collections::hash_map::Entry::Vacant(e) => {
+                    e.insert(episode.clone());
+                },
+                std::collections::hash_map::Entry::Occupied(mut e) => {
+                    if let (Some(existing_date), Some(new_date)) = (e.get().pub_date, episode.pub_date) {
+                        if new_date > existing_date {
+                            e.insert(episode.clone());
+                        }
+                    }
+                }
+            }
+        }
+        
+        let newest_episodes: Vec<Episode> = newest_episodes_map.into_values().collect();
+        
+        // Write newest episodes in each requested format
+        for format in &formats {
+            let newest_path = opml_path.parent().unwrap().join(format!("newest.{}", format));
+            write_episodes_to_file(
+                &newest_episodes, 
+                &newest_path, 
+                format, 
+                "Newest Podcast Episodes"
+            );
+        }
     }
 
     println!("Done. All episodes written to {}.", output_txt.display());
@@ -262,7 +440,7 @@ async fn main() {
 
 // Helper function to write episodes to a file in the specified format
 fn write_episodes_to_file(episodes: &[Episode], path: &PathBuf, format: &str, title: &str) {
-    match *format {
+    match format {
         "md" => {
             // Write in Markdown format
             let mut file = File::create(path).unwrap();
