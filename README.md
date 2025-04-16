@@ -1,4 +1,4 @@
-# PowerCrust v1.0
+# PowerCrust v1.1
 (this is a Rust re-implementation of my powercasts module)
 
 A command-line utility that extracts media files from RSS feeds listed in an OPML file.
@@ -12,6 +12,10 @@ A command-line utility that extracts media files from RSS feeds listed in an OPM
 - Supports multiple output formats for newest episodes (plain text, Markdown, HTML)
 - Optional chronological sorting of episodes in the output file [NOT FUNCTIONAL ATM]
 - Configurable time window for "current" episodes
+- [NEW] player
+   - https://v1d.dk/h/powercrust_player_v6.htm
+      - the app needs a newest.txt file, one is found here:
+      - https://v1d.dk/h/newest.txt
 
 ## Installation
 
