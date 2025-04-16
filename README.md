@@ -24,6 +24,10 @@ A command-line utility that extracts media files from RSS feeds listed in an OPM
 - [Rust](https://www.rust-lang.org/tools/install) (1.55 or newer)
 - Cargo (included with Rust)
 
+### How to Use the Linux executable
+
+Just copy the `powercrust` executable in /target/release to somewhere comfortable, then run it on your OPML file.
+
 ### Building from source
 
 ```bash
