@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerCrust Podcast Player</title>
+    <style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+:root {
+    --bg-gradient: radial-gradient(circle at top left, #202020, #121212);
+    --primary-color: #00e5ff;
+    --accent-color: #ff6f00;
+    --card-bg: #1e1e1e;
+    --control-bg: #2d2d2d;
+    --control-border: #444;
+    --progress-bg: #333;
+    --text-color: #e0e0e0;
+    --title-color: var(--accent-color);
+    --font-family: 'Orbitron', 'Courier New', monospace;
+    --border-radius: 6px;
+    --glow: 0 0 8px rgba(0, 229, 255, 0.5);
+    --btn-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --btn-gradient: linear-gradient(145deg, var(--control-bg), #000);
+    --btn-hover-gradient: linear-gradient(145deg, #000, var(--control-bg));
+}
+
+:root.light-mode {
+    --bg-gradient: radial-gradient(circle at top left, #f5f5f5, #e0e0e0);
+    --primary-color: #00aaff;
+    --accent-color: #ff6f00;
+    --card-bg: #ffffff;
+    --control-bg: #f0f0f0;
+    --control-border: #ccc;
+    --progress-bg: #ddd;
+    --text-color: #212121;
+    --title-color: var(--accent-color);
+    --btn-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --btn-gradient: linear-gradient(145deg, #fff, var(--control-bg));
+    --btn-hover-gradient: linear-gradient(145deg, var(--control-bg), #fff);
+}
+
+/* Core Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    background: var(--bg-gradient);
+    color: var(--text-color);
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: linear-gradient(145deg, #1a1a1a, #2a2a2a);
+    border-left: 4px solid var(--accent-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--glow);
+    margin-bottom: 20px;
+}
+
+:root.light-mode .header {
+    background: linear-gradient(145deg, #e8e8e8, #f8f8f8);
+    box-shadow: 0 0 8px rgba(0, 170, 255, 0.5);
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo {
+    width: 40px;
+    height: 40px;
+    background: var(--accent-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--bg-gradient);
+    box-shadow: var(--glow);
+}
+
+h1, h2 {
+    color: var(--title-color);
+    text-shadow: 1px 1px 3px rgba(0, 229, 255, 0.5);
+}
+
+h1 {
+    font-size: 1.8rem;
+}
+
+h2 {
+    margin-bottom: 15px;
+}
+
+/* Light mode fix — FINAL BOSS */
+:root.light-mode h1 {
+    color: var(--title-color) !important;
+    text-shadow: 1px 1px 3px rgba(0, 170, 255, 0.5);
+}
+
+/* Theme toggle */
+.theme-toggle {
+    background: var(--btn-gradient);
+    border: 2px solid var(--control-border);
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-color);
+    padding: 10px 15px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    box-shadow: var(--btn-shadow);
+    position: relative;
+    overflow: hidden;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.theme-toggle:hover {
+    background: var(--btn-hover-gradient);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+}
+
+.theme-toggle:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+
+:root.light-mode .theme-toggle {
+    background: var(--btn-gradient);
+    color: var(--text-color);
+    box-shadow: var(--btn-shadow);
+}
+
+/* Panels & Sections */
+.section {
+    background-color: var(--card-bg);
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: var(--border-radius);
+    border-left: 4px solid var(--primary-color);
+    box-shadow: 0 0 4px rgba(0, 229, 255, 0.4);
+}
+
+:root.light-mode .section {
+    box-shadow: 0 0 4px rgba(0, 170, 255, 0.4);
+}
+
+/* Buttons */
+button {
+    padding: 10px 15px;
+    background: var(--btn-gradient);
+    color: var(--text-color);
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    margin-right: 10px;
+    font-family: var(--font-family);
+    transition: all 0.2s ease;
+    box-shadow: var(--btn-shadow);
+}
+
+:root.light-mode button {
+    background: var(--btn-gradient);
+    color: var(--text-color);
+    box-shadow: var(--btn-shadow);
+}
+
+button:hover {
+    background: var(--btn-hover-gradient);
+    box-shadow: var(--glow);
+    transform: translateY(-2px);
+}
+
+:root.light-mode button:hover {
+    background: var(--btn-hover-gradient);
+    box-shadow: 0 0 8px rgba(0, 170, 255, 0.5);
+}
+
+button:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+
+button.secondary {
+    background: linear-gradient(145deg, var(--accent-color), #000);
+}
+
+:root.light-mode button.secondary {
+    background: linear-gradient(145deg, var(--accent-color), #fff);
+}
+
+button.secondary:hover {
+    background: linear-gradient(145deg, #000, var(--accent-color));
+}
+
+:root.light-mode button.secondary:hover {
+    background: linear-gradient(145deg, #fff, var(--accent-color));
+}
+
+/* Debug toggle */
+.debug-toggle {
+    color: var(--text-color);
+    text-decoration: underline;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 10px 15px;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-top: 10px;
+    display: block;
+    box-shadow: none;
+    transition: opacity 0.2s ease;
+}
+
+.debug-toggle:hover {
+    opacity: 1;
+    box-shadow: none;
+    background: none;
+    transform: none;
+}
+
+/* Track Items */
+.track {
+    padding: 15px;
+    background-color: var(--control-bg);
+    border-radius: var(--border-radius);
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border-left: 3px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.track:hover {
+    background-color: rgba(0, 229, 255, 0.1);
+}
+
+:root.light-mode .track:hover {
+    background-color: rgba(0, 170, 255, 0.1);
+}
+
+.track.active {
+    background-color: rgba(0, 229, 255, 0.15);
+    border-left: 3px solid var(--primary-color);
+}
+
+:root.light-mode .track.active {
+    background-color: rgba(0, 170, 255, 0.15);
+}
+
+.track-thumbnail {
+    width: 50px;
+    height: 50px;
+    background-color: var(--accent-color);
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: var(--text-color);
+    overflow: hidden;
+}
+
+.track-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.track-content {
+    flex: 1;
+}
+
+.track-title {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+.track-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Player Controls */
+.player-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+.control-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    padding: 0;
+    background: var(--btn-gradient);
+    border: 2px solid var(--control-border);
+    box-shadow: var(--btn-shadow);
+}
+
+:root.light-mode .control-btn {
+    background: var(--btn-gradient);
+    background-color: rgba(255, 255, 255, 0.7);
+    box-shadow: var(--btn-shadow);
+}
+
+.control-btn:hover {
+    background: var(--btn-hover-gradient);
+    box-shadow: var(--glow);
+}
+
+:root.light-mode .control-btn:hover {
+    background: var(--btn-hover-gradient);
+    background-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 8px rgba(0, 170, 255, 0.5);
+}
+
+.play-btn {
+    background-color: var(--accent-color);
+    width: 50px;
+    height: 50px;
+}
+
+:root.light-mode .play-btn {
+    background: linear-gradient(145deg, var(--accent-color), #fff);
+}
+
+.play-btn:hover {
+    background: linear-gradient(145deg, #000, var(--accent-color));
+}
+
+:root.light-mode .play-btn:hover {
+    background: linear-gradient(145deg, #fff, var(--accent-color));
+}
+
+/* Progress bar */
+.progress-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: var(--progress-bg);
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+}
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background-color: var(--primary-color);
+    border-radius: 4px;
+    box-shadow: 0 0 6px var(--primary-color);
+}
+.time-display {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* Now Playing */
+.now-playing {
+    background-color: var(--control-bg);
+    padding: 15px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+    border-left: 4px solid var(--accent-color);
+    box-shadow: 0 0 4px rgba(0, 229, 255, 0.4);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+:root.light-mode .now-playing {
+    box-shadow: 0 0 4px rgba(0, 170, 255, 0.4);
+}
+
+.now-playing-cover {
+    width: 100px;
+    height: 100px;
+    background-color: var(--card-bg);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    color: var(--accent-color);
+    border: 2px solid var(--accent-color);
+    box-shadow: var(--glow);
+}
+
+.now-playing-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.now-playing-info {
+    flex: 1;
+}
+
+.now-playing-title {
+    font-size: 1.3rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+.now-playing-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Playlist */
+.playlist-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.playlist-buttons {
+    display: flex;
+    gap: 10px;
+}
+.playlist-btn {
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--primary-color);
+    padding: 5px 10px;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 0.9rem;
+    box-shadow: none;
+}
+
+:root.light-mode .playlist-btn {
+    border: 1px solid var(--primary-color);
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.playlist-btn:hover {
+    background-color: rgba(0, 229, 255, 0.1);
+    box-shadow: var(--glow);
+    transform: none;
+}
+
+:root.light-mode .playlist-btn:hover {
+    background-color: rgba(0, 170, 255, 0.1);
+    box-shadow: 0 0 8px rgba(0, 170, 255, 0.5);
+}
+
+/* Inputs */
+.text-input {
+    width: 100%;
+    padding: 10px;
+    background-color: var(--control-bg);
+    border: 1px solid var(--control-border);
+    color: var(--text-color);
+    font-family: var(--font-family);
+    border-radius: var(--border-radius);
+    margin-bottom: 10px;
+}
+
+/* Cover URL Input */
+.cover-url-input {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.cover-url-input input {
+    flex: 1;
+}
+
+/* Cover art selection */
+.cover-art-section {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--control-border);
+}
+
+.cover-art-input {
+    margin: 10px 0;
+}
+
+.cover-status {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    padding: 8px;
+    border-radius: var(--border-radius);
+    background-color: var(--control-bg);
+    display: none;
+}
+
+/* Volume */
+.volume-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 20px;
+}
+.volume-icon {
+    font-size: 1.2rem;
+}
+.volume-slider {
+    -webkit-appearance: none;
+    width: 80px;
+    height: 4px;
+    background-color: var(--progress-bg);
+    border-radius: 2px;
+}
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    cursor: pointer;
+}
+
+/* Debug/Utility */
+.debug-log {
+    padding: 10px;
+    background-color: var(--control-bg);
+    border-radius: var(--border-radius);
+    font-size: 0.85rem;
+    max-height: 150px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+
+.hidden {
+    display: none;
+}
+
+.error-message {
+    background-color: rgba(255, 0, 0, 0.2);
+    color: #ff6b6b;
+    padding: 10px;
+    border-radius: var(--border-radius);
+    margin-top: 10px;
+    margin-bottom: 15px;
+    display: none;
+}
+
+/* Spinner */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--accent-color);
+    animation: spin 1s ease-in-out infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .player-controls {
+        flex-wrap: wrap;
+    }
+
+    .volume-container {
+        margin-left: 0;
+        margin-top: 10px;
+        width: 100%;
+    }
+
+    .volume-slider {
+        width: 100%;
+    }
+
+    .playlist-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .now-playing {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .now-playing-cover {
+        margin-bottom: 10px;
+    }
+
+    .now-playing-details {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-title">
+            <div class="logo">PC</div>
+            <h1>PowerCrust Podcast Player</h1>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" title="Toggle Light/Dark Mode">🌓</button>
+    </div>
+
+    <div class="section">
+        <h2>Load Your Podcast List</h2>
+        <input type="file" id="file-input" accept=".txt">
+        <button id="read-file-btn">Read File</button>
+
+        <!-- New cover art section -->
+        <div class="cover-art-section">
+            <h3>Cover Art Options</h3>
+            <div class="cover-art-input">
+                <input type="file" id="cover-art-input" accept="image/*" multiple>
+                <button id="load-covers-btn">Load Cover Images</button>
+            </div>
+            <div id="cover-status" class="cover-status"></div>
+
+            <div style="margin-top: 15px;">
+                <input type="text" id="cover-url-input" class="text-input" placeholder="Cover image URL (optional)">
+                <button id="add-cover-btn">Set Cover for Current Track</button>
+            </div>
+        </div>
+
+        <button class="debug-toggle" id="debug-toggle">Show Debug</button>
+
+        <div class="debug-container hidden" id="debug-container">
+            <div id="debug-log" class="debug-log">Ready to load podcasts...</div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <h3>Quick Add URL</h3>
+            <input type="text" id="url-input" class="text-input" placeholder="https://example.com/podcast.mp3">
+            <button id="add-url-btn">Add to Playlist</button>
+        </div>
+    </div>
+
+    <div id="player-section" class="section hidden">
+        <div id="error-message" class="error-message">
+            Error loading audio. The URL might be invalid or the server might be down.
+        </div>
+
+        <div class="now-playing">
+            <div class="now-playing-cover" id="now-playing-cover">
+                🎧
+            </div>
+            <div class="now-playing-info">
+                <div class="now-playing-title" id="now-playing-title">Select a track to play</div>
+                <div class="now-playing-details">
+                    <span id="now-playing-feed">-</span>
+                    <span id="now-playing-date">-</span>
+                </div>
+            </div>
+        </div>
+
+        <audio id="audio-player"></audio>
+
+        <div class="player-controls">
+            <button class="control-btn" id="prev-btn">⏮</button>
+            <button class="control-btn play-btn" id="play-btn">▶</button>
+            <button class="control-btn" id="next-btn">⏭</button>
+
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="time-display">
+                    <span id="current-time">00:00</span>
+                    <span id="duration">00:00</span>
+                </div>
+            </div>
+
+            <div class="volume-container">
+                <span class="volume-icon" id="volume-icon">🔊</span>
+                <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.01" value="0.7">
+            </div>
+        </div>
+    </div>
+
+    <div id="playlist-section" class="section hidden">
+        <div class="playlist-header">
+            <h2>Playlist (<span id="track-count">0</span>)</h2>
+            <div class="playlist-buttons">
+                <button class="playlist-btn" id="shuffle-btn">Shuffle</button>
+                <button class="playlist-btn" id="sort-date-btn">Sort by Date</button>
+                <button class="playlist-btn" id="random-covers-btn">Random Covers</button>
+            </div>
+        </div>
+        <div id="tracks-container"></div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const fileInput = document.getElementById('file-input');
+        const readFileBtn = document.getElementById('read-file-btn');
+        const debugLog = document.getElementById('debug-log');
+        const debugToggle = document.getElementById('debug-toggle');
+        const debugContainer = document.getElementById('debug-container');
+        const urlInput = document.getElementById('url-input');
+        const addUrlBtn = document.getElementById('add-url-btn');
+        const coverUrlInput = document.getElementById('cover-url-input');
+        const addCoverBtn = document.getElementById('add-cover-btn');
+        const coverArtInput = document.getElementById('cover-art-input');
+        const loadCoversBtn = document.getElementById('load-covers-btn');
+        const coverStatus = document.getElementById('cover-status');
+        const randomCoversBtn = document.getElementById('random-covers-btn');
+        const playerSection = document.getElementById('player-section');
+        const playlistSection = document.getElementById('playlist-section');
+        const tracksContainer = document.getElementById('tracks-container');
+        const trackCount = document.getElementById('track-count');
+        const audioPlayer = document.getElementById('audio-player');
+        const playBtn = document.getElementById('play-btn');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const progressFill = document.getElementById('progress-fill');
+        const currentTime = document.getElementById('current-time');
+        const duration = document.getElementById('duration');
+        const nowPlayingTitle = document.getElementById('now-playing-title');
+        const nowPlayingFeed = document.getElementById('now-playing-feed');
+        const nowPlayingDate = document.getElementById('now-playing-date');
+        const nowPlayingCover = document.getElementById('now-playing-cover');
+        const errorMessage = document.getElementById('error-message');
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeIcon = document.getElementById('volume-icon');
+        const themeToggle = document.getElementById('theme-toggle');
+        const shuffleBtn = document.getElementById('shuffle-btn');
+        const sortDateBtn = document.getElementById('sort-date-btn');
+
+        // App state
+        let playlist = [];
+        let currentTrackIndex = -1;
+        let isPlaying = false;
+        let availableCovers = [];
+
+        // Color palettes for generated covers
+        const colorPalettes = [
+            ['#ff6b6b', '#4ecdc4', '#1a535c', '#f7fff7', '#ff9f1c'],
+            ['#2b2d42', '#8d99ae', '#edf2f4', '#ef233c', '#d90429'],
+            ['#05668d', '#028090', '#00a896', '#02c39a', '#f0f3bd'],
+            ['#540d6e', '#ee4266', '#ffd23f', '#3bceac', '#0ead69'],
+            ['#5f0f40', '#9a031e', '#fb8b24', '#e36414', '#0f4c5c']
+        ];
+
+        // Toggle debug log
+        debugToggle.addEventListener('click', () => {
+            const isHidden = debugContainer.classList.contains('hidden');
+            debugContainer.classList.toggle('hidden');
+            debugToggle.textContent = isHidden ? 'Hide Debug' : 'Show Debug';
+        });
+
+        // Theme toggle
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('light-mode');
+            localStorage.setItem('powercrust_theme', document.documentElement.classList.contains('light-mode') ? 'light' : 'dark');
+        });
+
+        // Load theme preference
+        if (localStorage.getItem('powercrust_theme') === 'light') {
+            document.documentElement.classList.add('light-mode');
+        }
+
+        // Debug log helper
+        function log(message) {
+            const time = new Date().toLocaleTimeString();
+            debugLog.innerHTML += `[${time}] ${message}\n`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(`[${time}] ${message}`);
+        }
+
+        // Load cover images
+        loadCoversBtn.addEventListener('click', () => {
+            const files = coverArtInput.files;
+
+            if (!files || files.length === 0) {
+                log("No cover images selected. Please choose some images first.");
+                return;
+            }
+
+            // Clear previous covers to avoid memory leaks
+            availableCovers.forEach(cover => {
+                if (cover.url && cover.url.startsWith('blob:')) {
+                    try {
+                        URL.revokeObjectURL(cover.url);
+                    } catch (e) {
+                        console.error("Error revoking URL:", e);
+                    }
+                }
+            });
+
+            // Reset covers array
+            availableCovers = [];
+
+            // Process each file
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+
+                // Only process image files
+                if (!file.type.startsWith('image/')) {
+                    log(`Skipping non-image file: ${file.name}`);
+                    continue;
+                }
+
+                try {
+                    // Create object URL for the image
+                    const imageUrl = URL.createObjectURL(file);
+
+                    // Test loading the image
+                    const testImg = new Image();
+                    testImg.onload = function() {
+                        log(`Verified image: ${file.name}`);
+                    };
+                    testImg.onerror = function() {
+                        log(`Warning: Image ${file.name} might not load correctly`);
+                    };
+                    testImg.src = imageUrl;
+
+                    availableCovers.push({
+                        name: file.name,
+                        url: imageUrl
+                    });
+
+                    log(`Created URL for ${file.name}: ${imageUrl.substring(0, 30)}...`);
+                } catch (error) {
+                    log(`Error processing image ${file.name}: ${error.message}`);
+                }
+            }
+
+            coverStatus.style.display = 'block';
+            coverStatus.textContent = `${availableCovers.length} images loaded successfully`;
+            coverStatus.style.backgroundColor = 'rgba(0, 229, 255, 0.1)';
+
+            log(`Loaded ${availableCovers.length} cover images`);
+
+            // If we have a playlist, offer to assign covers
+            if (playlist.length > 0) {
+                log("Click 'Random Covers' button to apply images to your tracks");
+            }
+        });
+
+        // Generate a cover image as SVG
+        function generateCoverArt(title, index) {
+            // Select a color palette
+            const palette = colorPalettes[index % colorPalettes.length];
+            const bgColor = palette[0];
+            const textColor = palette[3];
+
+            // Get initials or first letter
+            const letter = title ? (title.charAt(0).toUpperCase()) : '♪';
+
+            // Create SVG
+            const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                <rect width="100" height="100" fill="${bgColor}" />
+                <circle cx="50" cy="50" r="30" fill="${palette[1]}" />
+                <text x="50" y="55" font-family="Arial, sans-serif" font-size="40"
+                      text-anchor="middle" fill="${textColor}" font-weight="bold">${letter}</text>
+                <path d="M20,20 L80,20" stroke="${palette[2]}" stroke-width="2" />
+                <path d="M20,80 L80,80" stroke="${palette[2]}" stroke-width="2" />
+                <path d="M15,15 L85,15" stroke="${palette[4]}" stroke-width="1" />
+                <path d="M15,85 L85,85" stroke="${palette[4]}" stroke-width="1" />
+            </svg>`;
+
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        }
+
+        // Assign random covers to playlist items
+        function assignRandomCovers() {
+            // Check if we have tracks
+            if (playlist.length === 0) {
+                log("No tracks in playlist to assign covers to");
+                return;
+            }
+
+            // Get tracks that need covers - include all tracks for reassignment
+            const tracksToUpdate = playlist.map((track, index) => ({track, index}));
+
+            if (tracksToUpdate.length === 0) {
+                log("No tracks to assign covers to");
+                return;
+            }
+
+            // If we have loaded cover images, use those
+            if (availableCovers.length > 0) {
+                log(`Assigning from ${availableCovers.length} loaded cover images`);
+
+                tracksToUpdate.forEach(({track, index}) => {
+                    // Select a random cover
+                    const randomIndex = Math.floor(Math.random() * availableCovers.length);
+                    track.coverUrl = availableCovers[randomIndex].url;
+                    log(`Assigned ${availableCovers[randomIndex].name} to track ${index+1}`);
+                });
+            }
+            // Otherwise generate SVG covers
+            else {
+                log("No loaded covers available, generating SVG covers");
+
+                tracksToUpdate.forEach(({track, index}) => {
+                    track.coverUrl = generateCoverArt(track.title, index);
+                    log(`Generated SVG cover for track ${index+1}`);
+                });
+            }
+
+            log(`Assigned ${tracksToUpdate.length} covers`);
+
+            // Force re-render the entire playlist
+            renderPlaylist();
+
+            // Update current track display if needed
+            if (currentTrackIndex >= 0 && currentTrackIndex < playlist.length) {
+                const track = playlist[currentTrackIndex];
+                log(`Updating now playing cover for "${track.title}"`);
+                loadCoverArt(nowPlayingCover, track.coverUrl, track.title);
+            }
+        }
+
+        // Event listener for random covers button
+        randomCoversBtn.addEventListener('click', assignRandomCovers);
+
+        // Parse podcast line
+        function parsePodcastLine(line) {
+            try {
+                // Match the format: Show Name: Episode Title [YYYY-MM-DD] - URL
+                // And variations on this pattern
+
+                // First, find the URL at the end
+                const urlMatch = line.match(/(https?:\/\/[^\s]+)$/);
+                if (!urlMatch) return null;
+
+                const url = urlMatch[1];
+
+                // Remove the URL from the line
+                const lineWithoutUrl = line.replace(url, '').trim();
+
+                // Check if there's a date in brackets
+                const dateMatch = lineWithoutUrl.match(/\[([\d-]+)\]/);
+                const date = dateMatch ? dateMatch[1] : '';
+
+                // Split the rest by the colon for show name and title
+                const colonIndex = lineWithoutUrl.indexOf(':');
+
+                if (colonIndex === -1) {
+                    // If no colon, just use the whole thing as the title
+                    return {
+                        feedName: "Unknown Show",
+                        title: lineWithoutUrl.replace(/\[[\d-]+\]/g, '').trim(),
+                        date: date,
+                        url: url,
+                        coverUrl: '' // Add coverUrl property with empty default
+                    };
+                }
+
+                const feedName = lineWithoutUrl.substring(0, colonIndex).trim();
+                let title = lineWithoutUrl.substring(colonIndex + 1).trim();
+
+                // Remove date from title if present
+                if (dateMatch) {
+                    title = title.replace(/\[[\d-]+\]/g, '').trim();
+                }
+
+                // Clean up the title if it has a hyphen before the URL
+                if (title.includes('-')) {
+                    const hyphenIndex = title.lastIndexOf('-');
+                    title = title.substring(0, hyphenIndex).trim();
+                }
+
+                return {
+                    feedName: feedName,
+                    title: title,
+                    date: date,
+                    url: url,
+                    coverUrl: '' // Add coverUrl property with empty default
+                };
+            } catch (e) {
+                log(`Error parsing line: ${e.message}`);
+                return null;
+            }
+        }
+
+        // Load or generate cover for an episode
+        function loadCoverArt(element, coverUrl, title) {
+            // Clear any existing content first
+            element.innerHTML = '';
+
+            if (coverUrl && coverUrl.trim() !== '') {
+                try {
+                    // Create image element regardless of URL type
+                    const img = document.createElement('img');
+                    img.alt = title || 'Cover Art';
+
+                    // Set up error handling before setting src
+                    img.onerror = function() {
+                        element.innerHTML = title ? title.charAt(0).toUpperCase() : '🎧';
+                        log(`Failed to load cover image: ${coverUrl.substring(0, 30)}...`);
+                    };
+
+                    // Set image source
+                    img.src = coverUrl;
+
+                    // Add image to container
+                    element.appendChild(img);
+
+                    // Debug info
+                    log(`Applied cover: ${coverUrl.substring(0, 20)}... for "${title}"`);
+                } catch (error) {
+                    // Fallback if any error occurs
+                    element.innerHTML = title ? title.charAt(0).toUpperCase() : '🎧';
+                    log(`Error applying cover: ${error.message}`);
+                }
+            } else {
+                // Use first letter of title or default emoji
+                element.innerHTML = title ? title.charAt(0).toUpperCase() : '🎧';
+            }
+        }
+
+        // Set cover for current track
+        addCoverBtn.addEventListener('click', () => {
+            const coverUrl = coverUrlInput.value.trim();
+
+            if (currentTrackIndex >= 0 && currentTrackIndex < playlist.length) {
+                // Update playlist item
+                playlist[currentTrackIndex].coverUrl = coverUrl;
+
+                // Update the displayed cover
+                loadCoverArt(nowPlayingCover, coverUrl, playlist[currentTrackIndex].title);
+
+                // Re-render playlist to show thumbnail
+                renderPlaylist();
+
+                log(`Updated cover for "${playlist[currentTrackIndex].title}"`);
+                coverUrlInput.value = '';
+            } else {
+                log("No track is currently selected");
+            }
+        });
+
+        // Read file button handler
+        readFileBtn.addEventListener('click', () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                log("No file selected. Please choose a file first.");
+                return;
+            }
+
+            log(`Reading file: ${file.name}`);
+
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                try {
+                    const content = event.target.result;
+                    log(`File loaded successfully: ${content.length} characters`);
+
+                    // Process each line
+                    const lines = content.split('\n');
+                    log(`Found ${lines.length} lines in the file`);
+
+                    // Reset playlist
+                    playlist = [];
+
+                    let validCount = 0;
+
+                    // Parse each line
+                    lines.forEach((line, index) => {
+                        if (!line.trim()) return; // Skip empty lines
+
+                        const podcastInfo = parsePodcastLine(line);
+
+                        if (podcastInfo) {
+                            playlist.push(podcastInfo);
+                            validCount++;
+
+                            // Log sample entries
+                            if (validCount <= 3 || validCount === lines.length) {
+                                log(`Added: ${podcastInfo.title} (${podcastInfo.feedName})`);
+                            } else if (validCount === 4) {
+                                log(`... and ${lines.length - 3} more entries`);
+                            }
+                        } else {
+                            log(`Skipped invalid line ${index + 1}: ${line.substring(0, 50)}...`);
+                        }
+                    });
+
+                    // Update UI
+                    if (validCount > 0) {
+                        trackCount.textContent = playlist.length;
+                        playerSection.classList.remove('hidden');
+                        playlistSection.classList.remove('hidden');
+                        log(`Successfully added ${validCount} podcasts to the playlist`);
+
+                        // Assign random covers
+                        assignRandomCovers();
+                    } else {
+                        log("No valid podcast entries found in the file");
+                    }
+
+                } catch (error) {
+                    log(`Error processing file: ${error.message}`);
+                }
+            };
+
+            reader.onerror = function() {
+                log("Error reading file");
+            };
+
+            reader.readAsText(file);
+        });
+
+        // Add URL manually
+        addUrlBtn.addEventListener('click', () => {
+            const url = urlInput.value.trim();
+            if (!url || !url.startsWith('http')) {
+                log("Please enter a valid URL");
+                return;
+            }
+
+            // Get cover URL if provided
+            const coverUrl = coverUrlInput.value.trim();
+
+            // Extract title from URL
+            const filename = url.split('/').pop() || 'Track';
+            const title = filename.split(/[.?&#]/)[0].replace(/[-_+]/g, ' ');
+
+            playlist.push({
+                feedName: "Manual Entry",
+                title: title,
+                date: new Date().toISOString().split('T')[0],
+                url: url,
+                coverUrl: coverUrl
+            });
+
+            // Update UI
+            trackCount.textContent = playlist.length;
+            renderPlaylist();
+            playerSection.classList.remove('hidden');
+            playlistSection.classList.remove('hidden');
+
+            // Clear input
+            urlInput.value = '';
+
+            // If no cover URL was provided, generate one
+            if (!coverUrl) {
+                assignRandomCovers();
+            }
+
+            log(`Added manual entry: ${title}${coverUrl ? ' with cover art' : ''}`);
+        });
+
+        // Render playlist
+        function renderPlaylist() {
+            tracksContainer.innerHTML = '';
+
+            playlist.forEach((track, index) => {
+                const trackEl = document.createElement('div');
+                trackEl.className = `track${index === currentTrackIndex ? ' active' : ''}`;
+
+                // Create track content with thumbnail
+                const thumbnailEl = document.createElement('div');
+                thumbnailEl.className = 'track-thumbnail';
+                loadCoverArt(thumbnailEl, track.coverUrl, track.title);
+
+                const contentEl = document.createElement('div');
+                contentEl.className = 'track-content';
+                contentEl.innerHTML = `
+                    <div class="track-title">${track.title}</div>
+                    <div class="track-info">
+                        <span class="track-feed">${track.feedName}</span>
+                        ${track.date ? `<span class="track-date">${track.date}</span>` : ''}
+                    </div>
+                `;
+
+                trackEl.appendChild(thumbnailEl);
+                trackEl.appendChild(contentEl);
+
+                trackEl.addEventListener('click', () => playTrack(index));
+                tracksContainer.appendChild(trackEl);
+            });
+        }
+
+        // Format time (seconds to MM:SS)
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Play track
+        function playTrack(index) {
+            if (index < 0 || index >= playlist.length) return;
+
+            // Hide error message
+            errorMessage.style.display = 'none';
+
+            // Update current track index
+            currentTrackIndex = index;
+
+            // Get track info
+            const track = playlist[index];
+
+            // Update now playing display
+            nowPlayingTitle.textContent = track.title;
+            nowPlayingFeed.textContent = track.feedName;
+            nowPlayingDate.textContent = track.date || '';
+
+            // Update cover art
+            loadCoverArt(nowPlayingCover, track.coverUrl, track.title);
+
+            // Update playlist highlight
+            renderPlaylist();
+
+            // Set audio source
+            audioPlayer.src = track.url;
+
+            // Load audio
+            audioPlayer.load();
+
+            // Play when loaded
+            audioPlayer.oncanplaythrough = function() {
+                audioPlayer.play()
+                    .then(() => {
+                        isPlaying = true;
+                        playBtn.textContent = '⏸';
+                    })
+                    .catch(error => {
+                        log(`Playback error: ${error.message}`);
+                        errorMessage.style.display = 'block';
+                    });
+            };
+
+            // Error handling
+            audioPlayer.onerror = function() {
+                log(`Error loading audio: ${track.url}`);
+                errorMessage.style.display = 'block';
+            };
+        }
+
+        // Toggle play/pause
+        function togglePlay() {
+            if (currentTrackIndex === -1 && playlist.length > 0) {
+                // Start playing the first track
+                playTrack(0);
+                return;
+            }
+
+            if (isPlaying) {
+                audioPlayer.pause();
+                playBtn.textContent = '▶';
+            } else {
+                audioPlayer.play()
+                    .then(() => {
+                        playBtn.textContent = '⏸';
+                    })
+                    .catch(error => {
+                        log(`Error resuming playback: ${error.message}`);
+                    });
+            }
+
+            isPlaying = !isPlaying;
+        }
+
+        // Play previous track
+        function playPrevious() {
+            if (audioPlayer.currentTime > 3) {
+                // If we're more than 3 seconds in, restart the current track
+                audioPlayer.currentTime = 0;
+                return;
+            }
+
+            const prevIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
+            playTrack(prevIndex);
+        }
+
+        // Play next track
+        function playNext() {
+            if (playlist.length === 0) return;
+
+            const nextIndex = (currentTrackIndex + 1) % playlist.length;
+            playTrack(nextIndex);
+            log(`Playing next track: ${nextIndex + 1}/${playlist.length}`);
+        }
+
+        // Update progress
+        function updateProgress() {
+            if (isNaN(audioPlayer.duration)) return;
+
+            const percent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+            progressFill.style.width = `${percent}%`;
+
+            currentTime.textContent = formatTime(audioPlayer.currentTime);
+            duration.textContent = formatTime(audioPlayer.duration);
+        }
+
+        // Seek audio position
+        function seek(event) {
+            if (isNaN(audioPlayer.duration)) return;
+
+            const rect = progressBar.getBoundingClientRect();
+            const pos = (event.clientX - rect.left) / rect.width;
+            audioPlayer.currentTime = pos * audioPlayer.duration;
+        }
+
+        // Shuffle playlist
+        function shufflePlaylist() {
+            if (playlist.length <= 1) return;
+
+            const currentTrack = currentTrackIndex !== -1 ? playlist[currentTrackIndex] : null;
+
+            // Fisher-Yates shuffle
+            for (let i = playlist.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+            }
+
+            // Find current track in new order
+            if (currentTrack) {
+                currentTrackIndex = playlist.findIndex(track => track.url === currentTrack.url);
+                log(`After shuffle, current track is now at position ${currentTrackIndex + 1}`);
+            }
+
+            renderPlaylist();
+            log("Playlist shuffled");
+        }
+
+        // Sort by date
+        function sortByDate() {
+            if (playlist.length <= 1) return;
+
+            const currentTrack = currentTrackIndex !== -1 ? playlist[currentTrackIndex] : null;
+
+            // Sort by date, newest first
+            playlist.sort((a, b) => {
+                if (!a.date && !b.date) return 0;
+                if (!a.date) return 1;
+                if (!b.date) return -1;
+                return new Date(b.date) - new Date(a.date);
+            });
+
+            // Find current track in new order
+            if (currentTrack) {
+                currentTrackIndex = playlist.findIndex(track => track.url === currentTrack.url);
+            }
+
+            renderPlaylist();
+            log("Playlist sorted by date");
+        }
+
+        // Update volume
+        function updateVolume() {
+            audioPlayer.volume = volumeSlider.value;
+
+            // Update volume icon
+            if (audioPlayer.volume === 0) {
+                volumeIcon.textContent = '🔇';
+            } else if (audioPlayer.volume < 0.5) {
+                volumeIcon.textContent = '🔉';
+            } else {
+                volumeIcon.textContent = '🔊';
+            }
+        }
+
+        // Save player state
+        function savePlayerState() {
+            const state = {
+                volume: audioPlayer.volume,
+                // Save playlist state including cover art
+                playlist: playlist,
+                currentTrackIndex: currentTrackIndex
+            };
+
+            localStorage.setItem('powercrust_state', JSON.stringify(state));
+        }
+
+        // Restore player state
+        function restorePlayerState() {
+            try {
+                const savedState = JSON.parse(localStorage.getItem('powercrust_state')) || {};
+
+                // Restore volume
+                if (typeof savedState.volume === 'number') {
+                    audioPlayer.volume = savedState.volume;
+                    volumeSlider.value = savedState.volume;
+                }
+
+                // Restore playlist and current track if available
+                if (Array.isArray(savedState.playlist) && savedState.playlist.length > 0) {
+                    playlist = savedState.playlist;
+                    trackCount.textContent = playlist.length;
+                    renderPlaylist();
+                    playerSection.classList.remove('hidden');
+                    playlistSection.classList.remove('hidden');
+
+                    // Restore current track index
+                    if (typeof savedState.currentTrackIndex === 'number' &&
+                        savedState.currentTrackIndex >= 0 &&
+                        savedState.currentTrackIndex < playlist.length) {
+                        currentTrackIndex = savedState.currentTrackIndex;
+
+                        // Update now playing info
+                        const track = playlist[currentTrackIndex];
+                        nowPlayingTitle.textContent = track.title;
+                        nowPlayingFeed.textContent = track.feedName;
+                        nowPlayingDate.textContent = track.date || '';
+
+                        // Update cover art
+                        loadCoverArt(nowPlayingCover, track.coverUrl, track.title);
+                    }
+                }
+            } catch (e) {
+                console.error('Error restoring state:', e);
+            }
+        }
+
+        // Event listeners
+        playBtn.addEventListener('click', togglePlay);
+        prevBtn.addEventListener('click', playPrevious);
+        nextBtn.addEventListener('click', playNext);
+        progressBar.addEventListener('click', seek);
+        volumeSlider.addEventListener('input', updateVolume);
+        shuffleBtn.addEventListener('click', shufflePlaylist);
+        sortDateBtn.addEventListener('click', sortByDate);
+
+        // Audio player events
+        audioPlayer.addEventListener('timeupdate', updateProgress);
+        audioPlayer.addEventListener('ended', playNext);
+        audioPlayer.addEventListener('pause', () => {
+            isPlaying = false;
+            playBtn.textContent = '▶';
+        });
+        audioPlayer.addEventListener('play', () => {
+            isPlaying = true;
+            playBtn.textContent = '⏸';
+        });
+
+        // Save state before unload
+        window.addEventListener('beforeunload', savePlayerState);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Space: Play/Pause
+            if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                togglePlay();
+            }
+
+            // Left Arrow: Rewind 10 seconds
+            if (e.code === 'ArrowLeft') {
+                audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 10);
+            }
+
+            // Right Arrow: Forward 10 seconds
+            if (e.code === 'ArrowRight') {
+                audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + 10);
+            }
+        });
+
+        // Initialize
+        restorePlayerState();
+        updateVolume();
+
+        // Initial log
+        log("PowerCrust Podcast Player v2.0 initialized with auto-generated cover art support");
+    </script>
+</body>
+</html>
