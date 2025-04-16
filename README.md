@@ -14,7 +14,7 @@ A command-line utility that extracts media files from RSS feeds listed in an OPM
 - Configurable time window for "current" episodes
 - [NEW] player
    - https://v1d.dk/h/powercrust_player_v6.htm
-      - the app needs a newest.txt file, one is found here:
+      - the player needs a powercrust format newest.txt file to run:
       - https://v1d.dk/h/newest.txt
 
 ## Installation
