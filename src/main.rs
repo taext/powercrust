@@ -3,7 +3,7 @@ use regex::Regex;
 use reqwest::{Client, StatusCode};
 use futures::future::join_all;
 use std::{
-    collections::HashSet,
+    collections::{HashSet, HashMap},
     fs::File,
     io::{BufRead, BufReader, Write},
     path::PathBuf,
@@ -27,6 +27,10 @@ async fn main() {
     let matches = App::new("RSS Feed Scraper")
         .version("0.3.0")
         .about("Scrapes RSS feeds from an OPML file and extracts media URLs")
+        .before_help("                   ▗ 
+▛▌▛▌▌▌▌█▌▛▘▛▘▛▘▌▌▛▘▜▘
+▙▌▙▌▚▚▘▙▖▌ ▙▖▌ ▙▌▄▌▐▖
+▌                    ")
         .arg(
             Arg::with_name("opml_file")
                 .help("Path to the OPML file containing RSS feeds")
@@ -58,10 +62,21 @@ async fn main() {
                 .default_value("false"),
         )
         .arg(
-            Arg::with_name("newest_format")
+            Arg::with_name("formats")
                 .short('f')
-                .long("format")
-                .help("Format for newest.txt output (txt, md, html)")
+                .long("formats")
+                .help("Format(s) for output files (txt, md, html), comma-separated")
+                .takes_value(true)
+                .default_value("txt")
+                .use_delimiter(true)
+                .require_delimiter(true)
+                .value_delimiter(","),
+        )
+        .arg(
+            Arg::with_name("all_files_format")
+                .short('a')
+                .long("all-format")
+                .help("Format for all_files output (txt, md, html)")
                 .takes_value(true)
                 .default_value("txt")
                 .possible_values(&["txt", "md", "html"]),
@@ -69,11 +84,13 @@ async fn main() {
         .get_matches();
 
     let opml_path = PathBuf::from(matches.value_of("opml_file").unwrap());
-    let output_txt = opml_path.with_extension("txt");
     
-    // Determine the newest output file extension based on format
-    let newest_format = matches.value_of("newest_format").unwrap_or("txt");
-    let newest_path = opml_path.parent().unwrap().join(format!("newest.{}", newest_format));
+    // Parse formats for newest files
+    let formats: Vec<&str> = matches.values_of("formats").unwrap_or_default().collect();
+    
+    // Get format for all_files
+    let all_files_format = matches.value_of("all_files_format").unwrap_or("txt");
+    let output_txt = opml_path.with_extension(all_files_format);
     
     let check_current = matches.value_of("check_current")
         .unwrap_or("true")
@@ -119,113 +136,13 @@ async fn main() {
     // Extract all episodes with dates for chronological sorting (if enabled)
     let media_regex = Regex::new(r#""(http\S+?\.(mp3|mp4))["?]"#).unwrap();
     
-    if chronological {
-        // Extract episodes with dates for chronological sorting
-        let mut all_episodes: Vec<Episode> = Vec::new();
-        
-        for (feed_name, content) in &raw_results {
-            if let Ok(channel) = Channel::read_from(content.as_bytes()) {
-                for item in channel.items() {
-                    // Find media URL using same logic as for newest episodes
-                    let media_url = if let Some(enclosure) = item.enclosure() {
-                        // First try the enclosure
-                        enclosure.url.clone()
-                    } else {
-                        // Fall back to regex search in item description or content
-                        let description = item.description().unwrap_or_default();
-                        let content_encoded = item.extensions().get("content")
-                            .and_then(|c| c.get("encoded"))
-                            .and_then(|e| e.first())
-                            .and_then(|v| v.value.as_deref())
-                            .unwrap_or_default();
-                        
-                        let combined_content = format!("{} {}", description, content_encoded);
-                        
-                        if let Some(cap) = media_regex.captures(&combined_content) {
-                            if let Some(url) = cap.get(1).map(|m| m.as_str().to_owned()) {
-                                url
-                            } else {
-                                continue; // Skip if no media URL found
-                            }
-                        } else {
-                            continue; // Skip if no media URL found
-                        }
-                    };
-                    
-                    // Parse publication date
-                    let pub_date = item.pub_date().and_then(|date_str| {
-                        DateTime::parse_from_rfc2822(date_str)
-                            .ok()
-                            .map(|dt| dt.with_timezone(&Utc))
-                    });
-                    
-                    // Skip if we're checking for currency and the episode is too old
-                    if check_current {
-                        if let Some(date) = pub_date {
-                            let cutoff_date = Utc::now() - Duration::days(current_days);
-                            if date < cutoff_date {
-                                continue;
-                            }
-                        } else {
-                            // If no date is available and we're checking for currency, skip
-                            continue;
-                        }
-                    }
-                    
-                    all_episodes.push(Episode {
-                        feed_name: feed_name.clone(),
-                        title: item.title().unwrap_or("Unknown").to_string(),
-                        pub_date,
-                        media_url,
-                    });
-                }
-            }
-        }
-        
-        // Sort episodes chronologically (oldest first)
-        all_episodes.sort_by(|a, b| {
-            match (&a.pub_date, &b.pub_date) {
-                (Some(a_date), Some(b_date)) => a_date.cmp(b_date),
-                (None, Some(_)) => std::cmp::Ordering::Less,
-                (Some(_), None) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
-        });
-        
-        // Write all media URLs to output file in chronological order
-        let mut file = File::create(output_txt).unwrap();
-        for episode in all_episodes {
-            writeln!(file, "{}", episode.media_url).unwrap();
-        }
-    } else {
-        // Original functionality (random order, just extracting URLs)
-        let media_urls: HashSet<String> = raw_results
-            .par_iter()
-            .flat_map(|(_, content)| {
-                media_regex
-                    .captures_iter(content)
-                    .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_owned()))
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-
-        // Write all media URLs to output file (original functionality)
-        let mut file = File::create(output_txt).unwrap();
-        for url in media_urls {
-            writeln!(file, "{}", url).unwrap();
-        }
-    }
-
-    // Process feeds to extract newest episodes
-    let mut newest_episodes: Vec<Episode> = Vec::new();
+    // Process feeds to extract episodes
+    let mut all_episodes: Vec<Episode> = Vec::new();
     
     for (feed_name, content) in &raw_results {
         if let Ok(channel) = Channel::read_from(content.as_bytes()) {
-            // Find newest episode for this feed
-            let mut feed_episodes = Vec::new();
-            
             for item in channel.items() {
-                // Find media URL
+                // Find media URL using same logic as for newest episodes
                 let media_url = if let Some(enclosure) = item.enclosure() {
                     // First try the enclosure
                     enclosure.url.clone()
@@ -271,52 +188,95 @@ async fn main() {
                     }
                 }
                 
-                feed_episodes.push(Episode {
+                all_episodes.push(Episode {
                     feed_name: feed_name.clone(),
                     title: item.title().unwrap_or("Unknown").to_string(),
                     pub_date,
                     media_url,
                 });
             }
-            
-            // Sort episodes by date (newest first)
-            feed_episodes.sort_by(|a, b| {
-                match (&b.pub_date, &a.pub_date) {
+        }
+    }
+    
+    // Sort episodes based on the chronological flag
+    if chronological {
+        // Sort episodes chronologically (oldest first)
+        all_episodes.sort_by(|a, b| {
+            match (&a.pub_date, &b.pub_date) {
+                (Some(a_date), Some(b_date)) => a_date.cmp(b_date),
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        });
+    } else {
+        // Sort by feed name and then by date (newest first within each feed)
+        all_episodes.sort_by(|a, b| {
+            match a.feed_name.cmp(&b.feed_name) {
+                std::cmp::Ordering::Equal => match (&b.pub_date, &a.pub_date) {
                     (Some(b_date), Some(a_date)) => b_date.cmp(a_date),
                     (Some(_), None) => std::cmp::Ordering::Less,
                     (None, Some(_)) => std::cmp::Ordering::Greater,
                     (None, None) => std::cmp::Ordering::Equal,
-                }
-            });
-            
-            // Take the newest episode
-            if let Some(newest) = feed_episodes.first() {
-                newest_episodes.push(Episode {
-                    feed_name: newest.feed_name.clone(),
-                    title: newest.title.clone(),
-                    pub_date: newest.pub_date,
-                    media_url: newest.media_url.clone(),
-                });
+                },
+                other => other,
             }
-        }
+        });
     }
     
-    // Write newest episodes in the requested format
-    match newest_format {
+    // Write all episodes to file in the requested format
+    write_episodes_to_file(
+        &all_episodes, 
+        &output_txt, 
+        all_files_format, 
+        "All Podcast Episodes"
+    );
+    
+    // Process feeds to extract newest episodes
+    let mut newest_episodes_map: HashMap<String, Episode> = HashMap::new();
+    
+    for episode in &all_episodes {
+        let entry = newest_episodes_map.entry(episode.feed_name.clone());
+        entry.or_insert_with(|| episode.clone());
+    }
+    
+    let newest_episodes: Vec<Episode> = newest_episodes_map.values().cloned().collect();
+    
+    // Write newest episodes in each requested format
+    for format in &formats {
+        let newest_path = opml_path.parent().unwrap().join(format!("newest.{}", format));
+        write_episodes_to_file(
+            &newest_episodes, 
+            &newest_path, 
+            format, 
+            "Newest Podcast Episodes"
+        );
+    }
+
+    println!("Done. All episodes written to {}.", output_txt.display());
+    for format in &formats {
+        let newest_path = opml_path.parent().unwrap().join(format!("newest.{}", format));
+        println!("Newest episodes written to {}.", newest_path.display());
+    }
+}
+
+// Helper function to write episodes to a file in the specified format
+fn write_episodes_to_file(episodes: &[Episode], path: &PathBuf, format: &str, title: &str) {
+    match *format {
         "md" => {
             // Write in Markdown format
-            let mut newest_file = File::create(&newest_path).unwrap();
+            let mut file = File::create(path).unwrap();
             
-            writeln!(newest_file, "# Newest Podcast Episodes").unwrap();
-            writeln!(newest_file).unwrap();
+            writeln!(file, "# {}", title).unwrap();
+            writeln!(file).unwrap();
             
-            for episode in newest_episodes {
+            for episode in episodes {
                 let date_str = episode.pub_date
                     .map(|d| d.format("%Y-%m-%d").to_string())
                     .unwrap_or_else(|| "Unknown date".to_string());
                     
                 writeln!(
-                    newest_file,
+                    file,
                     "## {}\n\n**{}** [{}]\n\n[Listen]({})  \n",
                     episode.feed_name,
                     episode.title,
@@ -327,54 +287,54 @@ async fn main() {
         },
         "html" => {
             // Write in HTML format
-            let mut newest_file = File::create(&newest_path).unwrap();
+            let mut file = File::create(path).unwrap();
             
-            writeln!(newest_file, "<!DOCTYPE html>").unwrap();
-            writeln!(newest_file, "<html>").unwrap();
-            writeln!(newest_file, "<head>").unwrap();
-            writeln!(newest_file, "    <meta charset=\"UTF-8\">").unwrap();
-            writeln!(newest_file, "    <title>Newest Podcast Episodes</title>").unwrap();
-            writeln!(newest_file, "    <style>").unwrap();
-            writeln!(newest_file, "        body {{ font-family: Arial, sans-serif; margin: 20px; }}").unwrap();
-            writeln!(newest_file, "        h1 {{ color: #333; }}").unwrap();
-            writeln!(newest_file, "        .episode {{ margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px; }}").unwrap();
-            writeln!(newest_file, "        .feed-name {{ font-size: 1.5em; color: #2c3e50; margin-bottom: 5px; }}").unwrap();
-            writeln!(newest_file, "        .episode-title {{ font-weight: bold; font-size: 1.2em; }}").unwrap();
-            writeln!(newest_file, "        .date {{ color: #7f8c8d; margin-bottom: 10px; }}").unwrap();
-            writeln!(newest_file, "        .media-link {{ margin-top: 10px; }}").unwrap();
-            writeln!(newest_file, "        .media-link a {{ color: #3498db; text-decoration: none; }}").unwrap();
-            writeln!(newest_file, "        .media-link a:hover {{ text-decoration: underline; }}").unwrap();
-            writeln!(newest_file, "    </style>").unwrap();
-            writeln!(newest_file, "</head>").unwrap();
-            writeln!(newest_file, "<body>").unwrap();
-            writeln!(newest_file, "    <h1>Newest Podcast Episodes</h1>").unwrap();
+            writeln!(file, "<!DOCTYPE html>").unwrap();
+            writeln!(file, "<html>").unwrap();
+            writeln!(file, "<head>").unwrap();
+            writeln!(file, "    <meta charset=\"UTF-8\">").unwrap();
+            writeln!(file, "    <title>{}</title>", title).unwrap();
+            writeln!(file, "    <style>").unwrap();
+            writeln!(file, "        body {{ font-family: Arial, sans-serif; margin: 20px; }}").unwrap();
+            writeln!(file, "        h1 {{ color: #333; }}").unwrap();
+            writeln!(file, "        .episode {{ margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px; }}").unwrap();
+            writeln!(file, "        .feed-name {{ font-size: 1.5em; color: #2c3e50; margin-bottom: 5px; }}").unwrap();
+            writeln!(file, "        .episode-title {{ font-weight: bold; font-size: 1.2em; }}").unwrap();
+            writeln!(file, "        .date {{ color: #7f8c8d; margin-bottom: 10px; }}").unwrap();
+            writeln!(file, "        .media-link {{ margin-top: 10px; }}").unwrap();
+            writeln!(file, "        .media-link a {{ color: #3498db; text-decoration: none; }}").unwrap();
+            writeln!(file, "        .media-link a:hover {{ text-decoration: underline; }}").unwrap();
+            writeln!(file, "    </style>").unwrap();
+            writeln!(file, "</head>").unwrap();
+            writeln!(file, "<body>").unwrap();
+            writeln!(file, "    <h1>{}</h1>", title).unwrap();
             
-            for episode in newest_episodes {
+            for episode in episodes {
                 let date_str = episode.pub_date
                     .map(|d| d.format("%Y-%m-%d").to_string())
                     .unwrap_or_else(|| "Unknown date".to_string());
                     
-                writeln!(newest_file, "    <div class=\"episode\">").unwrap();
-                writeln!(newest_file, "        <div class=\"feed-name\">{}</div>", html_escape(&episode.feed_name)).unwrap();
-                writeln!(newest_file, "        <div class=\"episode-title\">{}</div>", html_escape(&episode.title)).unwrap();
-                writeln!(newest_file, "        <div class=\"date\">{}</div>", date_str).unwrap();
-                writeln!(newest_file, "        <div class=\"media-link\"><a href=\"{}\">Listen</a></div>", episode.media_url).unwrap();
-                writeln!(newest_file, "    </div>").unwrap();
+                writeln!(file, "    <div class=\"episode\">").unwrap();
+                writeln!(file, "        <div class=\"feed-name\">{}</div>", html_escape(&episode.feed_name)).unwrap();
+                writeln!(file, "        <div class=\"episode-title\">{}</div>", html_escape(&episode.title)).unwrap();
+                writeln!(file, "        <div class=\"date\">{}</div>", date_str).unwrap();
+                writeln!(file, "        <div class=\"media-link\"><a href=\"{}\">Listen</a></div>", episode.media_url).unwrap();
+                writeln!(file, "    </div>").unwrap();
             }
             
-            writeln!(newest_file, "</body>").unwrap();
-            writeln!(newest_file, "</html>").unwrap();
+            writeln!(file, "</body>").unwrap();
+            writeln!(file, "</html>").unwrap();
         },
         _ => {
             // Default plain text format
-            let mut newest_file = File::create(&newest_path).unwrap();
-            for episode in newest_episodes {
+            let mut file = File::create(path).unwrap();
+            for episode in episodes {
                 let date_str = episode.pub_date
                     .map(|d| d.format("%Y-%m-%d").to_string())
                     .unwrap_or_else(|| "Unknown date".to_string());
                     
                 writeln!(
-                    newest_file,
+                    file,
                     "{}: {} [{}] - {}",
                     episode.feed_name,
                     episode.title,
@@ -384,9 +344,6 @@ async fn main() {
             }
         }
     }
-
-    println!("Done. All media URLs written to output file.");
-    println!("Newest episodes written to {}.", newest_path.display());
 }
 
 fn parse_opml(path: &PathBuf) -> Vec<(String, String)> {
