@@ -1,4 +1,3 @@
-use rayon::prelude::*;
 use regex::Regex;
 use reqwest::{Client, StatusCode};
 use futures::future::join_all;
@@ -156,59 +155,76 @@ async fn main() {
         for (feed_name, content) in &raw_results {
             if let Ok(channel) = Channel::read_from(content.as_bytes()) {
                 for item in channel.items() {
-                    // Find media URL
-                    let media_url = if let Some(enclosure) = item.enclosure() {
-                        // First try the enclosure
-                        enclosure.url.clone()
-                    } else {
-                        // Fall back to regex search in item description or content
-                        let description = item.description().unwrap_or_default();
-                        let content_encoded = item.extensions().get("content")
-                            .and_then(|c| c.get("encoded"))
-                            .and_then(|e| e.first())
-                            .and_then(|v| v.value.as_deref())
-                            .unwrap_or_default();
-                        
-                        let combined_content = format!("{} {}", description, content_encoded);
-                        
-                        if let Some(cap) = media_regex.captures(&combined_content) {
-                            if let Some(url) = cap.get(1).map(|m| m.as_str().to_owned()) {
-                                url
-                            } else {
-                                continue; // Skip if no media URL found
-                            }
-                        } else {
-                            continue; // Skip if no media URL found
-                        }
-                    };
-                    
-                    // Parse publication date
-                    let pub_date = item.pub_date().and_then(|date_str| {
-                        DateTime::parse_from_rfc2822(date_str)
-                            .ok()
-                            .map(|dt| dt.with_timezone(&Utc))
-                    });
-                    
-                    // Skip if we're checking for currency, filter_all is true,
-                    // and the episode is too old
-                    if check_current && filter_all {
-                        if let Some(date) = pub_date {
-                            let cutoff_date = Utc::now() - Duration::days(current_days);
-                            if date < cutoff_date {
-                                continue;
-                            }
-                        } else {
-                            // If no date is available and we're checking for currency, skip
-                            continue;
-                        }
-                    }
-                    
-                    all_episodes.push(Episode {
-                        feed_name: feed_name.clone(),
-                        title: item.title().unwrap_or("Unknown").to_string(),
-                        pub_date,
-                        media_url,
-                    });
+// --- Inside your for item in channel.items() loop ---
+
+// === MEDIA URL extraction ===
+let media_url = if let Some(enclosure) = item.enclosure() {
+    // Prefer <enclosure url="...">
+    enclosure.url.clone()
+} else {
+    // Fallback: scrape from description + content:encoded
+    let description = item.description().unwrap_or_default();
+    let content_encoded = item.extensions().get("content")
+        .and_then(|c| c.get("encoded"))
+        .and_then(|e| e.first())
+        .and_then(|v| v.value.as_deref())
+        .unwrap_or("");
+
+    let combined = format!("{} {}", description, content_encoded);
+
+    if let Some(cap) = media_regex.captures(&combined) {
+        if let Some(url_match) = cap.get(1) {
+            url_match.as_str().to_string()
+        } else {
+            continue; // no match
+        }
+    } else {
+        continue; // no media URL
+    }
+};
+
+// === PUB DATE fallback ===
+let date_str = item.pub_date()
+    .or_else(|| {
+        item.extensions().get("dc")
+            .and_then(|m| m.get("date"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.as_deref())
+    });
+
+let pub_date = date_str.and_then(|s| {
+    DateTime::parse_from_rfc2822(s)
+        .or_else(|_| DateTime::parse_from_rfc3339(s))
+        .or_else(|_| DateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ"))
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
+});
+
+// === TITLE fallback ===
+let title = item.title()
+    .map(|s| s.to_string())
+    .or_else(|| {
+        item.extensions().get("itunes")
+            .and_then(|m| m.get("title"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.clone())
+    })
+    .or_else(|| {
+        item.extensions().get("media")
+            .and_then(|m| m.get("title"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.clone())
+    })
+    .unwrap_or_else(|| "Unknown".to_string());
+
+// === Push the episode ===
+all_episodes.push(Episode {
+    feed_name: feed_name.clone(),
+    title,
+    pub_date,
+    media_url,
+});
+
                 }
             }
         }
@@ -279,32 +295,77 @@ async fn main() {
             // First extract through RSS for structured data
             if let Ok(channel) = Channel::read_from(content.as_bytes()) {
                 for item in channel.items() {
-                    if let Some(enclosure) = item.enclosure() {
-                        let pub_date = item.pub_date().and_then(|date_str| {
-                            DateTime::parse_from_rfc2822(date_str)
-                                .ok()
-                                .map(|dt| dt.with_timezone(&Utc))
-                        });
-                        
-                        // Only filter by date if filter_all is true
-                        if check_current && filter_all {
-                            if let Some(date) = pub_date {
-                                let cutoff_date = Utc::now() - Duration::days(current_days);
-                                if date < cutoff_date {
-                                    continue;
-                                }
-                            } else {
-                                continue;
-                            }
-                        }
-                        
-                        media_urls.push(Episode {
-                            feed_name: feed_name.clone(),
-                            title: item.title().unwrap_or("Unknown").to_string(),
-                            pub_date,
-                            media_url: enclosure.url.clone(),
-                        });
-                    }
+// --- Inside your for item in channel.items() loop ---
+
+// === MEDIA URL extraction ===
+let media_url = if let Some(enclosure) = item.enclosure() {
+    // Prefer <enclosure url="...">
+    enclosure.url.clone()
+} else {
+    // Fallback: scrape from description + content:encoded
+    let description = item.description().unwrap_or_default();
+    let content_encoded = item.extensions().get("content")
+        .and_then(|c| c.get("encoded"))
+        .and_then(|e| e.first())
+        .and_then(|v| v.value.as_deref())
+        .unwrap_or("");
+
+    let combined = format!("{} {}", description, content_encoded);
+
+    if let Some(cap) = media_regex.captures(&combined) {
+        if let Some(url_match) = cap.get(1) {
+            url_match.as_str().to_string()
+        } else {
+            continue; // no match
+        }
+    } else {
+        continue; // no media URL
+    }
+};
+
+// === PUB DATE fallback ===
+let date_str = item.pub_date()
+    .or_else(|| {
+        item.extensions().get("dc")
+            .and_then(|m| m.get("date"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.as_deref())
+    });
+
+let pub_date = date_str.and_then(|s| {
+    DateTime::parse_from_rfc2822(s)
+        .or_else(|_| DateTime::parse_from_rfc3339(s))
+        .or_else(|_| DateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ"))
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
+});
+
+
+// === TITLE fallback ===
+let title = item.title()
+    .map(|s| s.to_string())
+    .or_else(|| {
+        item.extensions().get("itunes")
+            .and_then(|m| m.get("title"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.clone())
+    })
+    .or_else(|| {
+        item.extensions().get("media")
+            .and_then(|m| m.get("title"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.clone())
+    })
+    .unwrap_or_else(|| "Unknown".to_string());
+
+// === Push the episode ===
+all_episodes.push(Episode {
+    feed_name: feed_name.clone(),
+    title,
+    pub_date,
+    media_url,
+});
+
                 }
             }
             
@@ -342,59 +403,76 @@ async fn main() {
         for (feed_name, content) in &raw_results {
             if let Ok(channel) = Channel::read_from(content.as_bytes()) {
                 for item in channel.items() {
-                    // Find media URL
-                    let media_url = if let Some(enclosure) = item.enclosure() {
-                        // First try the enclosure
-                        enclosure.url.clone()
-                    } else {
-                        // Fall back to regex search in item description or content
-                        let description = item.description().unwrap_or_default();
-                        let content_encoded = item.extensions().get("content")
-                            .and_then(|c| c.get("encoded"))
-                            .and_then(|e| e.first())
-                            .and_then(|v| v.value.as_deref())
-                            .unwrap_or_default();
-                        
-                        let combined_content = format!("{} {}", description, content_encoded);
-                        
-                        if let Some(cap) = media_regex.captures(&combined_content) {
-                            if let Some(url) = cap.get(1).map(|m| m.as_str().to_owned()) {
-                                url
-                            } else {
-                                continue; // Skip if no media URL found
-                            }
-                        } else {
-                            continue; // Skip if no media URL found
-                        }
-                    };
-                    
-                    // Parse publication date
-                    let pub_date = item.pub_date().and_then(|date_str| {
-                        DateTime::parse_from_rfc2822(date_str)
-                            .ok()
-                            .map(|dt| dt.with_timezone(&Utc))
-                    });
-                    
-                    // Only keep episodes from the last N days if check_current is enabled
-                    if check_current {
-                        if let Some(date) = pub_date {
-                            let cutoff_date = Utc::now() - Duration::days(current_days);
-                            if date < cutoff_date {
-                                continue;
-                            }
-                        } else {
-                            // If no date is available and we're checking for currency, skip
-                            continue;
-                        }
-                    }
-                    
-                    all_episodes.push(Episode {
-                        feed_name: feed_name.clone(),
-                        title: item.title().unwrap_or("Unknown").to_string(),
-                        pub_date,
-                        media_url,
-                    });
-                }
+// --- Inside your for item in channel.items() loop ---
+
+// === MEDIA URL extraction ===
+let media_url = if let Some(enclosure) = item.enclosure() {
+    // Prefer <enclosure url="...">
+    enclosure.url.clone()
+} else {
+    // Fallback: scrape from description + content:encoded
+    let description = item.description().unwrap_or_default();
+    let content_encoded = item.extensions().get("content")
+        .and_then(|c| c.get("encoded"))
+        .and_then(|e| e.first())
+        .and_then(|v| v.value.as_deref())
+        .unwrap_or("");
+
+    let combined = format!("{} {}", description, content_encoded);
+
+    if let Some(cap) = media_regex.captures(&combined) {
+        if let Some(url_match) = cap.get(1) {
+            url_match.as_str().to_string()
+        } else {
+            continue; // no match
+        }
+    } else {
+        continue; // no media URL
+    }
+};
+
+// === PUB DATE fallback ===
+let date_str = item.pub_date()
+    .or_else(|| {
+        item.extensions().get("dc")
+            .and_then(|m| m.get("date"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.as_deref())
+    });
+
+let pub_date = date_str.and_then(|s| {
+    DateTime::parse_from_rfc2822(s)
+        .or_else(|_| DateTime::parse_from_rfc3339(s))
+        .or_else(|_| DateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ"))
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
+});
+
+// === TITLE fallback ===
+let title = item.title()
+    .map(|s| s.to_string())
+    .or_else(|| {
+        item.extensions().get("itunes")
+            .and_then(|m| m.get("title"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.clone())
+    })
+    .or_else(|| {
+        item.extensions().get("media")
+            .and_then(|m| m.get("title"))
+            .and_then(|e| e.first())
+            .and_then(|e| e.value.clone())
+    })
+    .unwrap_or_else(|| "Unknown".to_string());
+
+// === Push the episode ===
+all_episodes.push(Episode {
+    feed_name: feed_name.clone(),
+    title,
+    pub_date,
+    media_url,
+});
+
             }
         }
         
@@ -571,4 +649,5 @@ fn html_escape(s: &str) -> String {
      .replace(">", "&gt;")
      .replace("\"", "&quot;")
      .replace("'", "&#39;")
+}
 }
