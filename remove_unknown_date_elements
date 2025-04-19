@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+rg -v '\[Unknown date\]' $1
+
